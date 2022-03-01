@@ -1,0 +1,13 @@
+name = "OECD_ICIO"
+uuid = "9b60c6e1-3dfb-46ed-9a99-a19c9718c1c9"
+authors = ["Florian Forsthuber <florian.forsthuber@gmail.com> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1.7"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
