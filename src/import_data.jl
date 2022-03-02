@@ -1,3 +1,6 @@
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Functions
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 function import_data(dir::String, source::String, revision::String, year::Integer)
 
@@ -48,4 +51,39 @@ function remove_reorder(Z::Matrix{Float64}, Y::Matrix{Float64}, W::Matrix{Float6
 
 end
 
+
+
+function trade(Z::Matrix{Float64}, Y::Matrix{Float64}, N::Integer, S::Integer, dimension::String)
+
+    if dimension == "industry"
+
+        # bilateral trade by exporting industry/country and importing country
+        #   - remove domestic trade
+        GRTR_INT = [sum(Z[i, j:j+S-1]) for i in 1:N*S, j in 1:S:N*S] # N×N
+        GRTR_FNL = Y
+
+        for i in 1:N*S
+            GRTR_INT[i, ceil(Int, i/S)] = 0.0
+            GRTR_FNL[i, ceil(Int, i/S)] = 0.0
+        end
+        
+    else 
+
+        # bilateral trade by exporting country and importing country
+        #   - remove domestic trade
+        GRTR_INT = [sum(Z[i:i+S-1, j:j+S-1]) for i in 1:S:N*S, j in 1:S:N*S] # N×N
+        GRTR_FNL = [sum(Y[i:i+S-1, j]) for i in 1:S:N*S, j in 1:N] # N×N
+
+        for i in 1:N
+            GRTR_INT[i, i] = 0.0
+            GRTR_FNL[i, i] = 0.0
+        end
+
+    end
+
+    GRTR = GRTR_INT .+ GRTR_FNL # N×N
+
+    return GRTR_INT, GRTR_FNL, GRTR
+
+end
 
