@@ -53,37 +53,76 @@ end
 
 
 
-function trade(Z::Matrix{Float64}, Y::Matrix{Float64}, N::Integer, S::Integer, dimension::String)
+function exports(Z::Matrix{Float64}, Y::Matrix{Float64}, N::Integer, S::Integer, dimension::String)
 
     if dimension == "industry"
 
         # bilateral trade by exporting industry/country and importing country
         #   - remove domestic trade
-        GRTR_INT = [sum(Z[i, j:j+S-1]) for i in 1:N*S, j in 1:S:N*S] # N×N
-        GRTR_FNL = Y
+        EXGR_INT = [sum(Z[i, j:j+S-1]) for i in 1:N*S, j in 1:S:N*S] # NS×N
+        EXGR_FNL = Y # NS×N
 
         for i in 1:N*S
-            GRTR_INT[i, ceil(Int, i/S)] = 0.0
-            GRTR_FNL[i, ceil(Int, i/S)] = 0.0
+            EXGR_INT[i, ceil(Int, i/S)] = 0.0
+            EXGR_FNL[i, ceil(Int, i/S)] = 0.0
         end
         
     else 
 
         # bilateral trade by exporting country and importing country
         #   - remove domestic trade
-        GRTR_INT = [sum(Z[i:i+S-1, j:j+S-1]) for i in 1:S:N*S, j in 1:S:N*S] # N×N
-        GRTR_FNL = [sum(Y[i:i+S-1, j]) for i in 1:S:N*S, j in 1:N] # N×N
+        EXGR_INT = [sum(Z[i:i+S-1, j:j+S-1]) for i in 1:S:N*S, j in 1:S:N*S] # N×N
+        EXGR_FNL = [sum(Y[i:i+S-1, j]) for i in 1:S:N*S, j in 1:N] # N×N
 
         for i in 1:N
-            GRTR_INT[i, i] = 0.0
-            GRTR_FNL[i, i] = 0.0
+            EXGR_INT[i, i] = 0.0
+            EXGR_FNL[i, i] = 0.0
         end
 
     end
 
-    GRTR = GRTR_INT .+ GRTR_FNL # N×N
+    EXGR = EXGR_INT .+ EXGR_FNL
 
-    return GRTR_INT, GRTR_FNL, GRTR
+    return EXGR, EXGR_INT, EXGR_FNL
 
 end
 
+
+
+function imports(Z::Matrix{Float64}, Y::Matrix{Float64}, N::Integer, S::Integer, dimension::String)
+
+    if dimension == "industry"
+
+        # bilateral trade by exporting industry/country and importing country
+        #   - remove domestic trade
+        IMGR_INT = [sum(Z[i:i+S-1, j]) for i in 1:S:N*S, j in 1:N*S] # N×NS
+        IMGR_FNL = [sum(Y[i:i+S-1, j]) for i in 1:S:N*S, j in 1:N] # N×N
+
+        for i in 1:N*S
+            IMGR_INT[ceil(Int, i/S), i] = 0.0
+            IMGR_FNL[ceil(Int, i/S), ceil(Int, i/S)] = 0.0
+        end
+        
+        # cannot add up since final demand is not differentiated along industries
+
+        return IMGR_INT, IMGR_FNL
+
+    else 
+
+        # bilateral trade by exporting country and importing country
+        #   - remove domestic trade
+        IMGR_INT = [sum(Z[i:i+S-1, j:j+S-1]) for i in 1:S:N*S, j in 1:S:N*S] # N×N
+        IMGR_FNL = [sum(Y[i:i+S-1, j]) for i in 1:S:N*S, j in 1:N] # N×N
+
+        for i in 1:N
+            IMGR_INT[ceil(Int, i/S), ceil(Int, i/S)] = 0.0
+            IMGR_FNL[ceil(Int, i/S), ceil(Int, i/S)] = 0.0
+        end
+
+        IMGR = IMGR_INT .+ IMGR_FNL # N×N
+
+        return IMGR, IMGR_INT, IMGR_FNL
+
+    end
+
+end

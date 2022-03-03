@@ -9,7 +9,7 @@ dir = "X:/VIVES/1-Personal/Florian/git/OECD_ICIO/src/"
 dir_raw = "C:/Users/u0148308/data/raw/" # location of raw data
 
 # other scripts
-include(dir * "import_data.jl") # Script with functions to import and transform raw data
+include(dir * "functions.jl") # Script with functions to import and transform raw data
 
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -40,7 +40,6 @@ any(X .< 0.0)
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # other basic matrices
-V = W ./ X # NS×1, value added to output ratio (notice: in OECD its a row vector)
 
 A = Z ./ repeat(X', N*S) # NS×NS, input coefficients
 A .= ifelse.(isnan.(A), 0.0, A) # in case X = 0 (otherwise we cannot compute Leontief inverse since NaN in A)
@@ -49,4 +48,35 @@ B = inv(I - A) # NS×NS, Leontief inverse
 
 count(broadcast(in, B*[sum(Y[i,:]) for i in 1:N*S] ./ X, 0.95..1.05) .== 0) # gives number of values lying outside of interval
 
-GRTR_INT, GRTR_FNL, GRTR = trade(Z, Y, N, S, "industry")
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 4.1 PROD: Production (gross output), USD million
+X
+
+# 4.2 VALU: Value added, USD million
+W
+
+# 4.3 PROD_VASH: Value added as a share of Gross Output, by industry, percentage
+V = W ./ X # NS×1, (row vector in OECD)
+
+# 4.4 EXGR | EXGR_INT | EXGR_FNL: Gross exports, by industry and by partner country, USD million (f.o.b.)
+#   - to obtain total => [sum(EXGR[i, :]) for i in 1:N]
+EXGR, EXGR_INT, EXGR_FNL = exports(Z, Y, N, S, "country") # N×N
+EXGR, EXGR_INT, EXGR_FNL = exports(Z, Y, N, S, "industry") # NS×N
+
+# 4.5. IMGR | IMGR_INT | IMGR_FNL: Gross imports, by industry and by partner country, USD million (f.o.b.)
+#   - to obtain total => [sum(IMGR[:, i]) for i in 1:N]
+IMGR, IMGR_INT, IMGR_FNL = imports(Z, Y, N, S, "country") # N×N
+IMGR_INT, IMGR_FNL = imports(Z, Y, N, S, "industry") # N×NS, N×N
+
+# 4.6. BALGR | BALGR_INT | BALGR_FNL: Gross trade balance, by partner country, USD million (f.o.b.)
+EXGR, EXGR_INT, EXGR_FNL = exports(Z, Y, N, S, "country") # N×N
+IMGR, IMGR_INT, IMGR_FNL = imports(Z, Y, N, S, "country") # N×N
+
+#   - to obtain total => [sum(BALGR[i, :]) for i in 1:N], [sum(BALGR[:, i]) for i in 1:N]
+#   - look at one row: negative/positive => import more than export (trade deficit) / export more than import (trade surplus)
+#   - look at one column: positive/negative => import more than export (trade deficit) / export more than import (trade surplus)
+BALGR = EXGR .- IMGR' # N×N
+BALGR_INT = EXGR_INT .- IMGR_INT' # N×N
+BALGR_FNL = EXGR_FNL .- IMGR_FNL' # N×N
