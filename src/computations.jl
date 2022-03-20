@@ -50,6 +50,17 @@ count(broadcast(in, B*[sum(Y[i,:]) for i in 1:N*S] ./ X, 0.95..1.05) .== 0) # gi
 
 
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Crosscheck computations with TiVA database: https://stats.oecd.org/Index.aspx?datasetcode=TIVA_2021_C1#
+# reporter:
+#   - country: AUT (n = 2)
+#   - industry: D16 (wood and wood products) (s = 8)
+#   - row number: (n-1)*S+s = 1*S+8 = 53
+# partner:
+#   - country: DEU (n = 13)
+#   - industry: D41T43 (construction) (s = 25)
+#   - column number: (n-1)*S+s = 12*S+25 = 565
+#   - column number: (n-1)*S+s = 12*S+8 = 548 (for imports, i.e. D16 as origin industry)
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # 4.1 PROD: Production (gross output), USD million
 X
@@ -80,3 +91,27 @@ IMGR, IMGR_INT, IMGR_FNL = imports(Z, Y, N, S, "country") # N×N
 BALGR = EXGR .- IMGR' # N×N
 BALGR_INT = EXGR_INT .- IMGR_INT' # N×N
 BALGR_FNL = EXGR_FNL .- IMGR_FNL' # N×N
+
+# 4.7. EXGRpSH: Gross exports, partner shares, by industry, percentage
+EXGR, EXGR_INT, EXGR_FNL = exports(Z, Y, N, S, "industry") # NS×N
+
+#   - total exports by industry
+EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N*S]
+
+EXGRpSH_INT = EXGR_INT ./ repeat(EXGR_TOTAL, 1, N) .* 100 # what to do with NaN?
+EXGRpSH_FNL = EXGR_FNL ./ repeat(EXGR_TOTAL, 1, N) .* 100
+EXGRpSH = EXGR ./ repeat(EXGR_TOTAL, 1, N) .* 100
+
+all([sum(EXGRpSH[i, :]) for i in 1:N*S] .≈ 100)
+
+# 4.8. IMGRpSH: Gross imports, partner shares %, by industry, percentage (DONT UNDERSTAND!)
+IMGR, IMGR_INT, IMGR_FNL = imports(Z, Y, N, S, "country") # N×N
+
+#   - total imports
+IMGR_TOTAL = [sum(IMGR[:, i]) for i in 1:N]
+
+IMGRpSH_INT = IMGR_INT ./ repeat(IMGR_TOTAL', N) .* 100 # what to do with NaN?
+IMGRpSH_FNL = IMGR_FNL ./ repeat(IMGR_TOTAL', N) .* 100
+IMGRpSH = IMGR ./ repeat(IMGR_TOTAL', N) .* 100
+
+all([sum(IMGRpSH[:, i]) for i in 1:N] .≈ 100)
