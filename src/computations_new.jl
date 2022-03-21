@@ -287,18 +287,180 @@ EXGR_DDC = reduce(vcat, EXGR_DDC) # NS×1, collapse vector
 # 5.6. EXGR_IDC: Indirect domestic content of gross exports (originating from domestic intermediates), USD million
 EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "industry", "exports") # NS×N
 
-EXGR_IDC = Vector{Float64}[] # initialize
+EXGR_IDC_i = fill(0.0, N*S, S) # initialize
 for c in 1:N
     v_hat = Diagonal(V[(c-1)*S+1:c*S])
-    
     b_offdiag = B[(c-1)*S+1:c*S, (c-1)*S+1:c*S]
     for i in 1:S b_offdiag[i, i] = 0.0 end
-    
-    e = [sum(EXGR[i, :]) for i in (c-1)*S+1:c*S]
-    push!(EXGR_IDC, v_hat * b_offdiag * e)
+    e_tot = [sum(EXGR[i, :]) for i in (c-1)*S+1:c*S]
+    for s in 1:S
+        e = fill(0.0, S)
+        e[s] = e_tot[s]
+        EXGR_IDC_i[(c-1)*S+s, :] = v_hat * b_offdiag * e
+    end
 end
 
-#   - ctry: AUT, industry: D16 indirect domestic value added content to total gross exports => EXGR_IDC[53]
-EXGR_IDC = reduce(vcat, EXGR_IDC) # NS×1, collapse vector
+#   - ctry: AUT, industry: D16 indirect domestic value added content to total gross exports from ind: D41T43 => EXGR_IDC_i[53, 25]
+EXGR_IDC_i # NS×S
 
-# not correct!
+#   - ctry: AUT, industry: D16 indirect domestic value added content to total gross exports => EXGR_IDC[53]
+EXGR_IDC = [sum(EXGR_IDC_i[i, :]) for i in 1:N*S] # NS×1
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.7. EXGR_RIM: Re-imported domestic value added content of gross exports, USD million
+
+#   - total domestic value added in gross exports per industry
+EXGR_DVA_TOTAL = [sum(EXGR_DVA[i, :]) for i in 1:N*S]
+
+#   - ctry: AUT, industry: D16 re-imported domestic value added content to total gross exports => EXGR_RIM[53]
+EXGR_RIM = EXGR_DVA_TOTAL .- EXGR_DDC .- EXGR_IDC
+
+# wrong => no discrepancy?
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.8. EXGR_FVA: Foreign value added content of gross exports, by industry, USD million
+#   - EXGR_RIM is included in EXGR_FVA!
+EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "industry", "exports") # NS×N
+
+v_hat = Diagonal(V) # NS×NS
+EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N*S] # NS×1, total exports per industry
+
+EXGR_FVA_all = fill(0.0, N*S, N*S) # initialize
+
+for c in 1:N
+    for s in 1:S
+        b_column = B[:, (c-1)*S+s] # all input requirements of country: c, industry: s from each other country-industry pair
+        b_column[(c-1)*S+1:c*S] .= 0 # all domestic input requirements are set to zero => since captured by EXGR_DVA
+        
+        fva = v_hat * b_column * EXGR_TOTAL'
+        EXGR_FVA_all[(c-1)*S+s, :] .= fva[:, (c-1)*S+s]
+    end
+end
+
+#   - ctry: AUT, industry: D16 foreign value added content in gross exports => EXGR_FVA[53]
+EXGR_FVA = [sum(EXGR_FVA_all[i, :]) for i in 1:N*S] # NS×1
+
+#   - ctry: AUT, industry: D16 foreign value added content in gross exports per partner ctry: DEU => EXGR_FVA_p[53, 13]
+EXGR_FVA_p = [sum(EXGR_FVA_all[i, (j-1)*S+1:j*S]) for i in 1:N*S, j in 1:N] # N×NS
+
+any([sum(EXGR_FVA_p[i, :]) for i in 1:N*S] ≈ EXGR_FVA)
+
+#   - ctry: AUT, ind: D16 foreign value added content in gross exports per partner ctry: DEU, ind: D41T43 => EXGR_FVA_all[53, 565]
+EXGR_FVA_all # NS×NS
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.9. EXGR_FVASH: Foreign value added share of gross exports, percentage
+#   - EXGR_RIM is included in EXGR_FVA!
+#   - see 5.8. for EXGR_FVA_all computation
+EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "industry", "exports") # NS×N
+
+EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N*S] # NS×1, total exports per industry
+
+#   - ctry: AUT percentage share of foreign value added content in gross exports in ind: D16 => EXGR_FVASH[53]
+EXGR_FVASH = EXGR_FVA ./ EXGR_TOTAL .* 100 # NS×1, what to do with NaN?
+
+#   - ctry: AUT, ind: D16 percentage points of foreign value added content in gross exports by partner ctry: DEU => EXGR_FVApSH[53, 13]
+#       + EXGR_FVApSH[53, 13] percentage points of foreign value added in ctry: AUT, ind: D16 originates in ctry: DEU
+#       + EXGR_FVASH[53] = 30% of VA comes is foreign, EXGR_FVApSH[53, 13] = 8 p.p. originate in DEU
+#           i.e. EXGR_FVApSH[53, 13]/EXGR_FVASH[53] = 8/30 = 27% of FVA in ctry: AUT, ind: D16 comes from DEU
+EXGR_FVApSH = EXGR_FVA_p ./ repeat(EXGR_TOTAL, 1, N) .* 100
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.10. EXGR_TFVAIND Industry foreign value added contribution to gross exports, a as a percentage of total gross exports
+EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "country", "exports") # NS×N
+
+EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N] # N×1, total exports
+
+#   - ctry: AUT, ind: D16 percentage share of foreign value added content in total gross exports => EXGR_TFVAIND[53]
+#       + EXGR_TFVAIND[53] = 0.67 p.p. of foreign value added contained in AUT exports are contained in industry D16
+#           i.e. to compare across industries
+EXGR_TFVAIND = EXGR_FVA ./ repeat(EXGR_TOTAL, inner=S) .* 100
+
+#   - ctry: AUT percentage share of foreign value added content in total gross exports => EXGR_TFVAIND_c[2]
+EXGR_TFVAIND_c = [sum(EXGR_TFVAIND[(i-1)*S+1:i*S]) for i in 1:N]
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 7.1. EXGR_BSCI: Origin of value added in gross exports, USD million
+EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "industry", "exports") # NS×N
+
+EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N*S] # NS×1, total exports per industry
+v_hat = Diagonal(V) # NS×NS, diagonalized value added coefficients
+
+EXGR_BSCI = fill(0.0, N*S, N*S) # initialize
+for c in 1:N
+    for s in 1:S
+        e = fill(0.0, N*S)
+        e[(c-1)*S+s] = EXGR_TOTAL[(c-1)*S+s]
+
+        EXGR_BSCI[(c-1)*S+s, :] = v_hat * B * e
+    end
+end
+
+#   - ctry: AUT, ind: D16 value added in gross exports originating from ctry: DEU, ind: D41T43 => EXGR_BSCI[53, 565]
+EXGR_BSCI
+
+#   - EXGR_BSCI gathers all value added information (why not compute other statistics from there?)
+#       + domestic value added in ctry: AUT, ind: D16 => sum(EXGR_BSCI[53, 45:90]) == sum(EXGR_DVA[53,:])
+#       + direct domestic value added in ctry: AUT, ind: D16 => EXGR_BSCI[53, 53] == EXGR_DDC[53]
+#       + indirect domestic value added in ctry: AUT, ind: D16 => sum(EXGR_BSCI[53, [46:52; 54:90]]) == EXGR_IDC[53]
+#       + foreign value added in ctry: AUT, ind: D16 => sum(EXGR_BSCI[53, [1:45; 91:N*S]]) == EXGR_FVA[53]
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.11. DEXFVApSH: Backward participation in GVCs, percentage
+EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "country", "exports") # NS×N
+
+EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N] # N×1, total exports
+
+#   - ctry: AUT value added in total gross exports from ctry: DEU => EXGR_BSCI_c[2, 13]
+EXGR_BSCI_c = [sum(EXGR_BSCI[(c-1)*S+1:c*S, (p-1)*S+1:p*S]) for c in 1:N, p in 1:N] # N×N
+
+#   - ctry: AUT percentage share of value added in total gross exports originating from ctry: DEU => DEXFVApSH[2, 13]
+#       + DEXFVApSH[2, 13] = 8.3% of value added exports from AUT originates from DEU
+DEXFVApSH = EXGR_BSCI_c ./ repeat(EXGR_TOTAL, 1, N) .* 100
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.12. EXGR_DVAFXSH: Domestic value added embodied in foreign exports as share of gross exports, percentage
+EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "country", "exports") # NS×N
+
+EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N] # N×1, total exports
+
+#   - ctry: AUT, ind: D16 value added in total gross exports from ctry: DEU => EXGR_BSCI_c_i[53, 13]
+EXGR_BSCI_c_i = [sum(EXGR_BSCI[i, (p-1)*S+1:p*S]) for i in 1:N*S, p in 1:N] # NS×N
+
+EXGR_DVAFXSH = Float64[] # initialize
+for c in 1:N
+    va_c = EXGR_BSCI_c_i[:, c] # column gives domestic VA per ctry c in contained in row country-industry
+    va_c[(c-1)*S+1:c*S] .= 0.0 # set domestic VA to c's own exports to zero
+    for s in 1:S
+        va_c_i = va_c[s:S:N*S] # subset to industry i
+        share = sum(va_c_i) / EXGR_TOTAL[c] * 100 # sum for total (i.e. WORLD as partner) and divide by c's total exports
+        push!(EXGR_DVAFXSH, share)
+    end
+end
+
+#   - VA originating from ctry: AUT, ind: D16 as percentage share of total exports => EXGR_DVAFXSH[53]
+#       + AUT domestic value added content embodied in the gross exports of industry D16 in foreign countries 
+#           as a percentage of total gross exports of country AUT
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.13. FEXDVApSH: Forward participation in GVCs, percentage
+EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "country", "exports") # NS×N
+
+EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N] # N×1, total exports
+
+#   - ctry: AUT value added in total gross exports from ctry: DEU => EXGR_BSCI_c[2, 13]
+EXGR_BSCI_c = [sum(EXGR_BSCI[(c-1)*S+1:c*S, (p-1)*S+1:p*S]) for c in 1:N, p in 1:N] # N×N
+
+#   - ctry: AUT percentage share of domestic value added in total gross exports of ctry: DEU => FEXDVApSH[2, 13]
+#       + FEXDVApSH[2, 13] = 1.2% of DEU exports is domestic value added from originating in AUT
+FEXDVApSH = EXGR_BSCI_c ./ repeat(EXGR_TOTAL', N) .* 100
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------

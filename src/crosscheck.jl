@@ -25,11 +25,20 @@ a = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x ==
 a = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x == "D16"),
      :VAR => ByRow(x -> x in ["EXGR_DVASH", "EXGR_TDVAIND"]))
 
-     a = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :PARTNER_ISO => ByRow(x -> x == "DEU"), :IND => ByRow(x -> x == "D16"),
+a = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :PARTNER_ISO => ByRow(x -> x == "DEU"), :IND => ByRow(x -> x == "D16"),
      :VAR => ByRow(x -> x in ["EXGR_DVAPSH"]))
 
-     a = subset(df, :DECLARANT_ISO => ByRow(x -> x == "DEU"), :PARTNER_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x == "D16"),
+a = subset(df, :DECLARANT_ISO => ByRow(x -> x == "DEU"), :PARTNER_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x == "D16"),
      :VAR => ByRow(x -> x in ["EXGR_DVAPSH"]))
 
-     a = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x == "D16"),
+a = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x == "D16"),
+     :VAR => ByRow(x -> x in ["EXGR_DDC"]))
+
+a = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x == "D16"),
      :VAR => ByRow(x -> x in ["EXGR_IDC"]))
+
+a = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x == "D16"), :PARTNER_ISO => ByRow(x -> x == "WLD"),
+     :VAR => ByRow(x -> x in ["EXGR_DVA", "EXGR_FVA", "EXGR_RIM"]))
+
+aa = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x == "D03"), :PARTNER_ISO => ByRow(x -> x == "DEU"),
+     :VAR => ByRow(x -> x in ["DEXFVAPSH"]))
