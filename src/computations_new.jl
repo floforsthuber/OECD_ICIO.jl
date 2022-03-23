@@ -253,8 +253,6 @@ EXGR_TDVAIND = EXGR_DVA_TOTAL ./ repeat(EXGR_TOTAL, inner=S) .* 100 # NS×1, wha
 #   - same as 5.2. but now on the differentiated along partners
 #   - [sum(EXGR_DVApSH[i, :]) for i in 1:N*S] .== EXGR_DVASH
 
-EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "industry", "exports") # NS×N
-
 #   - total domestic value added contained in gross exports by industry
 EXGR_DVA_TOTAL = [sum(EXGR_DVA[i, :]) for i in 1:N*S] # NS×1
 
@@ -460,7 +458,155 @@ EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N] # N×1, total exports
 EXGR_BSCI_c = [sum(EXGR_BSCI[(c-1)*S+1:c*S, (p-1)*S+1:p*S]) for c in 1:N, p in 1:N] # N×N
 
 #   - ctry: AUT percentage share of domestic value added in total gross exports of ctry: DEU => FEXDVApSH[2, 13]
-#       + FEXDVApSH[2, 13] = 1.2% of DEU exports is domestic value added from originating in AUT
+#       + FEXDVApSH[2, 13] = 1.2% of DEU exports is domestic value added originating in AUT
 FEXDVApSH = EXGR_BSCI_c ./ repeat(EXGR_TOTAL', N) .* 100
 
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.14. EXGR_INTDVASH: Domestic value added in exports of intermediate products, as a share of total gross exports, percentage
+#   - same calculation as for 5.1. EXGR_DVA
+EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "industry", "exports") # NS×N
+
+#   - ctry: AUT, industry: D16 domestic value added content of gross exports in intermediate input to ctry: DEU => EXGR_INTDVA[53, 13]
+EXGR_INTDVA = fill(0.0, N*S, N) # NS×N, initialize
+
+for c in 1:N
+    v = V[(c-1)*S+1:c*S] # V_c
+    b = B[(c-1)*S+1:c*S, (c-1)*S+1:c*S] # B_c,c
+    exgr = EXGR_INT[(c-1)*S+1:c*S, :] # all exports of country "c"
+    for p in 1:N
+        for i in 1:S
+            e = fill(0.0, S) # initialize zero vector
+            e[i] = exgr[i, p] # export value of country "c", industry "i" and partner country "p"
+            EXGR_INTDVA[(c-1)*S+i, p] = v'*b*e
+        end
+    end
+end
+
+EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N*S] # NS×1, total industry exports
+
+#   - total domestic value added contained in gross exports intermediate inputs by industry
+EXGR_INTDVA_TOTAL = [sum(EXGR_INTDVA[i, :]) for i in 1:N*S] # NS×1
+
+#   - ctry: AUT, industry: D16 share of domestic value added in gross exports of intermediate inputs as percentage of total industry exports => EXGR_INTDVASH[53]
+EXGR_INTDVASH = EXGR_INTDVA_TOTAL ./ EXGR_TOTAL .* 100 # NS×1, what to do with NaN?
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.15. EXGR_FNLDVASH: Domestic value added in exports of final products, as a share of total gross exports, percentage
+#   - same calculation as for 5.1. EXGR_DVA and 5.14. EXGR_INTDVA
+EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "industry", "exports") # NS×N
+
+#   - ctry: AUT, industry: D16 domestic value added content of gross final demand exports to ctry: DEU => EXGR_FNLDVA[53, 13]
+EXGR_FNLDVA = fill(0.0, N*S, N) # NS×N, initialize
+
+for c in 1:N
+    v = V[(c-1)*S+1:c*S] # V_c
+    b = B[(c-1)*S+1:c*S, (c-1)*S+1:c*S] # B_c,c
+    exgr = EXGR_FNL[(c-1)*S+1:c*S, :] # all exports of country "c"
+    for p in 1:N
+        for i in 1:S
+            e = fill(0.0, S) # initialize zero vector
+            e[i] = exgr[i, p] # export value of country "c", industry "i" and partner country "p"
+            EXGR_FNLDVA[(c-1)*S+i, p] = v'*b*e
+        end
+    end
+end
+
+EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N*S] # NS×1, total industry exports
+
+#   - total domestic value added contained in gross final demand exports by industry
+EXGR_FNLDVA_TOTAL = [sum(EXGR_FNLDVA[i, :]) for i in 1:N*S] # NS×1
+
+#   - ctry: AUT, industry: D16 share of domestic value added in gross exports of final demand as percentage of total industry exports => EXGR_FNLDVASH[53]
+EXGR_FNLDVASH = EXGR_FNLDVA_TOTAL ./ EXGR_TOTAL .* 100 # NS×1, what to do with NaN?
+
+any(EXGR_INTDVASH .+ EXGR_FNLDVASH .== EXGR_DVASH)
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.16. EXGR_INTDVApSH: Domestic value added in exports of intermediate products, partner shares, percentage
+
+#   - total domestic value added contained in gross exports by industry
+EXGR_INTDVA_TOTAL = [sum(EXGR_INTDVA[i, :]) for i in 1:N*S] # NS×1
+
+#   - ctry: AUT, industry: D16 domestic value added in gross exports of intermediate inputs to ctry: DEU 
+#           as percentage of total industry domestic value added exports of intermediate inputs => EXGR_INTDVApSH[53,13]
+#       + EXGR_INTDVApSH[53,13] = 19% of domestic value added of intermediate input exports from AUT in D16 go to DEU
+EXGR_INTDVApSH = EXGR_INTDVA ./ repeat(EXGR_INTDVA_TOTAL, 1, N) .* 100 # NS×N, what to do with NaN?
+
+EXGR_INTDVApSH .= ifelse.(isnan.(EXGR_INTDVApSH), 0.0, EXGR_INTDVApSH)
+count([sum(EXGR_INTDVApSH[i,:]) for i in 1:N*S] .≈ 100.0)
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.16.1 EXGR_FNLDVApSH: Domestic value added in exports of final products, partner shares, percentage
+
+#   - total domestic value added contained in gross exports by industry
+EXGR_FNLDVA_TOTAL = [sum(EXGR_FNLDVA[i, :]) for i in 1:N*S] # NS×1
+
+#   - ctry: AUT, industry: D16 domestic value added in gross exports of final products to ctry: DEU 
+#           as percentage of total industry domestic value added exports of final products => EXGR_FNLDVApSH[53,13]
+#       + EXGR_FNLDVApSH[53,13] = 38% of domestic value added of final product exports from AUT in D16 go to DEU
+EXGR_FNLDVApSH = EXGR_FNLDVA ./ repeat(EXGR_FNLDVA_TOTAL, 1, N) .* 100 # NS×N, what to do with NaN?
+
+EXGR_FNLDVApSH .= ifelse.(isnan.(EXGR_FNLDVApSH), 0.0, EXGR_FNLDVApSH)
+count([sum(EXGR_FNLDVApSH[i,:]) for i in 1:N*S] .≈ 100.0)
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.19. IMGR_DVA: Domestic value added embodied in gross imports, USD million
+IMGR, IMGR_INT, IMGR_FNL = trade(Z, Y, N, S, "industry", "imports") # N×NS
+
+#   - ctry: AUT domestic value added content of gross imports from ctry: DEU, ind: D16 => IMGR_DVA[2, 548]
+IMGR_DVA = fill(0.0, N, N*S) # NS×N, initialize
+
+for c in 1:N
+    v = V[(c-1)*S+1:c*S] # V_c
+    for p in 1:N
+        b = B[(c-1)*S+1:c*S, (p-1)*S+1:p*S] # B_c,p
+        imgr = Diagonal(IMGR[c, (p-1)*S+1:p*S])
+        IMGR_DVA[c, (p-1)*S+1:p*S] = v'*b*imgr
+    end
+end
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.20. IMGR_DVASH: Domestic value added share of gross imports, percentage
+IMGR, IMGR_INT, IMGR_FNL = trade(Z, Y, N, S, "industry", "imports") # N×NS
+
+IMGR_TOTAL = [sum(IMGR[:, j]) for j in 1:N*S]
+
+#   - ctry: AUT share of domestic value added in gross imports from ctry: DEU, ind: 16 => IMGR_DVASH[2, 548]
+IMGR_DVASH = IMGR_DVA ./ IMGR .* 100 # N×NS, what to do with NaN? (i.e. domestic va imported from own ctry)
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.21. REII: Re-exported intermediate imports, USD million
+EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "industry", "exports") # NS×N
+
+EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N*S] # NS×1, total industry exports
+
+REII = fill(0.0, N*S, N*S)
+
+for c in 1:N
+    for p in 1:N
+        a = A[(p-1)*S+1:p*S, (c-1)*S+1:c*S]
+        for i in 1:S a[i, i] = 0 end
+        b = B[(c-1)*S+1:c*S, (c-1)*S+1:c*S]
+        e = EXGR_TOTAL[(c-1)*S+1:c*S]
+        REII[c, (p-1)*S+1:p*S] = a*b*e
+    end
+end
+
+sum(REII[:,53])
+
+
+c = 2
+p = 13
+a = A[(p-1)*S+1:p*S, (c-1)*S+1:c*S]
+for i in 1:S a[i, i] = 0 end
+e = EXGR_TOTAL[(c-1)*S+1:c*S]
+b = B[(c-1)*S+1:c*S, (c-1)*S+1:c*S]
+
+a*b*e
