@@ -35,14 +35,37 @@ end
 
 function remove_reorder(Z::Matrix{Float64}, Y::Matrix{Float64}, W::Matrix{Float64}, X::Matrix{Float64}, N::Integer, S::Integer)
 
-    # substitute MX1/CH1 for MEX/CHN and delete MX2/CH2
-    n_Z = [1:(N-43)*S; N*S+1:(N+1)*S; (N-42)*S+1:(N-24)*S; (N+2)*S+1:(N+3)*S; (N-23)*S+1:N*S]
-    n_Y = [1:(N-43); (N+1); (N-41):(N-24); (N+2); (N-22):N]
+    # merge MX1 and MX2 and substitute for MEX
+    # rows
+    Z[(N-43)*S+1:(N-42)*S, :] .= Z[(N-43)*S+1:(N-42)*S, :] .+ Z[N*S+1:(N+1)*S, :] .+ Z[(N+1)*S+1:(N+2)*S, :]
+    Y[(N-43)*S+1:(N-42)*S, :] .= Y[(N-43)*S+1:(N-42)*S, :] .+ Y[N*S+1:(N+1)*S, :] .+ Y[(N+1)*S+1:(N+2)*S, :]
+    W[(N-43)*S+1:(N-42)*S] .= W[(N-43)*S+1:(N-42)*S] .+ W[N*S+1:(N+1)*S] .+ W[(N+1)*S+1:(N+2)*S]
+    X[(N-43)*S+1:(N-42)*S] .= X[(N-43)*S+1:(N-42)*S] .+ X[N*S+1:(N+1)*S] .+ X[(N+1)*S+1:(N+2)*S]
+    # columns
+    Z[:, (N-43)*S+1:(N-42)*S] .= Z[:, (N-43)*S+1:(N-42)*S] .+ Z[:, N*S+1:(N+1)*S] .+ Z[:, (N+1)*S+1:(N+2)*S]
+    Y[:, (N-42)] .= Y[:, (N-42)] .+ Y[:, (N+1)] .+ Y[:, (N+2)]
+    # added domest trade twice! (actually no double counting because columns/rows are designed to avoid)
+    # Z[(N-43)*S+1:(N-42)*S, (N-43)*S+1:(N-42)*S] .= Z[(N-43)*S+1:(N-42)*S, (N-43)*S+1:(N-42)*S] ./ 2
+    # Y[(N-43)*S+1:(N-42)*S, (N-42)] .= Y[(N-43)*S+1:(N-42)*S, (N-42)] ./ 2
 
-    Z = Z[n_Z, n_Z]
-    Y = Y[n_Z, n_Y]
-    W = W[n_Z]
-    X = X[n_Z]
+    # merge CH1 and CH2 and substitute for CHN
+    # rows
+    Z[(N-24)*S+1:(N-23)*S, :] .= Z[(N-24)*S+1:(N-23)*S, :] .+ Z[(N+2)*S+1:(N+3)*S, :] .+ Z[(N+3)*S+1:(N+4)*S, :]
+    Y[(N-24)*S+1:(N-23)*S, :] .= Y[(N-24)*S+1:(N-23)*S, :] .+ Y[(N+2)*S+1:(N+3)*S, :] .+ Y[(N+3)*S+1:(N+4)*S, :]
+    W[(N-24)*S+1:(N-23)*S] .= W[(N-24)*S+1:(N-23)*S] .+ W[(N+2)*S+1:(N+3)*S] .+ W[(N+3)*S+1:(N+4)*S]
+    X[(N-24)*S+1:(N-23)*S] .= X[(N-24)*S+1:(N-23)*S] .+ X[(N+2)*S+1:(N+3)*S] .+ X[(N+3)*S+1:(N+4)*S]
+    # columns
+    Z[:, (N-24)*S+1:(N-23)*S] .= Z[:, (N-24)*S+1:(N-23)*S] .+ Z[:, (N+2)*S+1:(N+3)*S] .+ Z[:, (N+3)*S+1:(N+4)*S]
+    Y[:, (N-23)] .= Y[:, (N-23)] .+ Y[:, (N+3)] .+ Y[:, (N+4)]
+    # added domestic trade twice! (actually no double counting because columns/rows are designed to avoid)
+    # Z[(N-24)*S+1:(N-23)*S, (N-24)*S+1:(N-23)*S] .= Z[(N-24)*S+1:(N-23)*S, (N-24)*S+1:(N-23)*S] ./ 2
+    # Y[(N-24)*S+1:(N-23)*S, (N-23)] .= Y[(N-24)*S+1:(N-23)*S, (N-23)] ./ 2
+
+    # delete MX1/CH1 and MX2/CH2
+    Z = Z[1:N*S, 1:N*S]
+    Y = Y[1:N*S, 1:N]
+    W = W[1:N*S]
+    X = X[1:N*S]
 
     return Z, Y, W, X
 

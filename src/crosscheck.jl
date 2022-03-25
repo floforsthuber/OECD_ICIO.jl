@@ -25,4 +25,8 @@ aa = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x =
      :VAR => ByRow(x -> x in ["RIII"]))
 
 aa = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x == "D16"),
-     :VAR => ByRow(x -> x in ["REII"]))
+     :VAR => ByRow(x -> x in ["EXGR_FVA"]))
+
+aa = subset(df, :IND => ByRow(x -> x == "D16"),
+     :VAR => ByRow(x -> x in ["VALU_FFDDVA"]))
+

@@ -403,7 +403,7 @@ end
 EXGR_BSCI
 
 #   - EXGR_BSCI gathers all value added information (why not compute other statistics from there?)
-#       + domestic value added in ctry: AUT, ind: D16 => sum(EXGR_BSCI[53, 45:90]) == sum(EXGR_DVA[53,:])
+#       + domestic value added in ctry: AUT, ind: D16 => sum(EXGR_BSCI[53, 45:90]) ≈ sum(EXGR_DVA[53,:])
 #       + direct domestic value added in ctry: AUT, ind: D16 => EXGR_BSCI[53, 53] == EXGR_DDC[53]
 #       + indirect domestic value added in ctry: AUT, ind: D16 => sum(EXGR_BSCI[53, [46:52; 54:90]]) == EXGR_IDC[53]
 #       + foreign value added in ctry: AUT, ind: D16 => sum(EXGR_BSCI[53, [1:45; 91:N*S]]) == EXGR_FVA[53]
@@ -575,8 +575,6 @@ end
 # 5.20. IMGR_DVASH: Domestic value added share of gross imports, percentage
 IMGR, IMGR_INT, IMGR_FNL = trade(Z, Y, N, S, "industry", "imports") # N×NS
 
-IMGR_TOTAL = [sum(IMGR[:, j]) for j in 1:N*S]
-
 #   - ctry: AUT share of domestic value added in gross imports from ctry: DEU, ind: 16 => IMGR_DVASH[2, 548]
 IMGR_DVASH = IMGR_DVA ./ IMGR .* 100 # N×NS, what to do with NaN? (i.e. domestic va imported from own ctry)
 
@@ -587,26 +585,91 @@ EXGR, EXGR_INT, EXGR_FNL = trade(Z, Y, N, S, "industry", "exports") # NS×N
 
 EXGR_TOTAL = [sum(EXGR[i, :]) for i in 1:N*S] # NS×1, total industry exports
 
-REII = fill(0.0, N*S, N*S)
+REII_p = fill(0.0, N*S, N)
 
 for c in 1:N
     for p in 1:N
         a = A[(p-1)*S+1:p*S, (c-1)*S+1:c*S]
-        for i in 1:S a[i, i] = 0 end
-        b = B[(c-1)*S+1:c*S, (c-1)*S+1:c*S]
+        #for i in 1:S a[i, i] = 0 end # written in TiVA guide but not true
         e = EXGR_TOTAL[(c-1)*S+1:c*S]
-        REII[c, (p-1)*S+1:p*S] = a*b*e
+        b = B[(c-1)*S+1:c*S, (c-1)*S+1:c*S]
+        REII_p[(c-1)*S+1:c*S, p] = a*b*e
     end
 end
 
-sum(REII[:,53])
+#   - Total intermediate products imported in ctry: AUT, ind: D16 originated from ctry: DEU => REII_p[53, 13]
+REII_p # NS×N
+
+REII = copy(REII_p)
+for c in 1:N*S
+    REII[c, ceil(Int, c/S)] = 0.0 # set all domestic contributions to zero
+end
+
+#   - Total intermediate products absorbed in ctry: AUT, ind: D16 originated from all foreign countries => REII_p[53]
+#       + sum(REII_p[53, :]) - REII_p[53, 2] ≈ REII[53]
+REII = [sum(REII[i, :]) for i in 1:N*S] # NS×1
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 5.22. IMGRINT_REII: Re-exported intermediate imports as a % of total intermediate imports, percentage
+#   - ctry: DEU imports from ctry: AUT, industry: D16 => IMGR[13,53]
+IMGR, IMGR_INT, IMGR_FNL = trade(Z, Y, N, S, "industry", "imports") # N×NS
+
+IMGR_INT_TOTAL = [sum(IMGR_INT[i, s:S:N*S]) for i in 1:N, s in 1:S] # N×S, total intermediate industry imports
+
+#   - ctry: AUT, ind: D16 re-exported intermediate imports as a share of total intermediate imports from all foreign countries => IMGRINT_REII[53]
+IMGRINT_REII = REII ./ reshape(IMGR_INT_TOTAL', N*S) .* 100 # NS×1
+
+#   - ctry: AUT, ind: D16 re-exported intermediate imports as a share of total intermediate imports from ctry: DEU => IMGRINT_REII_p[53, 13]
+IMGRINT_REII_p = REII_p ./ IMGR_INT' .* 100 # NS×N, what to do with Inf?
+
+IMGRINT_REII_p .= ifelse.(isinf.(IMGRINT_REII_p), 0.0, IMGRINT_REII_p)
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 6.1. FFD_DVA: Domestic value added embodied in foreign final demand, USD million
+v_hat = Diagonal(V)
+FD = copy(Y)
+
+#   - Value added originating in ctry:AUT, ind: D16 embodied in final demand of ctry: DEU => FFD_DVA[53, 13]
+FFD_DVA = v_hat * B * FD # NS×N
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 6.2. FFD_DVApSH: Domestic value added embodied in foreign final demand, partner shares, percentage
+FFD_DVA_c = copy(FFD_DVA)
+for c in 1:N*S
+    FFD_DVA_c[c, ceil(Int, c/S)] = 0.0 # do not count domestic value added to domestic FD in total
+end
+FFD_DVA_TOTAL = [sum(FFD_DVA_c[i, :]) for i in 1:N*S] # NS×1
+
+#   - Value added originating in ctry:AUT, ind: D16 embodied in final demand of ctry: DEU 
+#       as percentage of total domestic value added originating in ctry: AUT, ind: D16 demanded abroad => FFD_DVApSH[53, 13]
+FFD_DVApSH = FFD_DVA_c ./ repeat(FFD_DVA_TOTAL, 1, N) .* 100 # NS×N, what to do with NaN?
+
+count([sum(FFD_DVApSH[i, :]) for i in 1:N*S] .≈ 100)
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 6.3. VALU_FFDDVA: Domestic value added embodied in foreign final demand as a % of total value added, percentage
+VALU = copy(W) # NS×1, industry value added
+
+FFD_DVA_c = copy(FFD_DVA)
+for c in 1:N*S
+    FFD_DVA_c[c, ceil(Int, c/S)] = 0.0 # do not count domestic value added to domestic FD in total
+end
+
+#   - Domestic value added from ctry: AUT, ind: D16 embodied in foreign final demand in ctry: DEU 
+#       as percentage of total value added of ctry: AUT, ind: D16 => VALU_FFDDVA_p[53, 13]
+VALU_FFDDVA_p = FFD_DVA_c ./ repeat(VALU, 1, N) .* 100
 
 
-c = 2
-p = 13
-a = A[(p-1)*S+1:p*S, (c-1)*S+1:c*S]
-for i in 1:S a[i, i] = 0 end
-e = EXGR_TOTAL[(c-1)*S+1:c*S]
-b = B[(c-1)*S+1:c*S, (c-1)*S+1:c*S]
+#   - Domestic value added from ctry: AUT, ind: D16 embodied in total foreign final demand
+#       as percentage of total value added of ctry: AUT, ind: D16 => VALU_FFDDVA[53]
+VALU_FFDDVA = [sum(VALU_FFDDVA_p[i, :]) for i in 1:N*S]
 
-a*b*e
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 6.4. DFD_FVA: Foreign value added embodied in domestic final demand, USD million
+
+DFD_FVA = FFD_DVA'
