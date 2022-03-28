@@ -22,7 +22,7 @@ df.DECLARANT_LAB .= ifelse.(df.DECLARANT_LAB .== "European Union (27 countries)"
 
 
 aa = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x == "D16"), :PARTNER_ISO => ByRow(x -> x == "DEU"),
-     :VAR => ByRow(x -> x in ["RIII"]))
+     :VAR => ByRow(x -> x in ["DFD_FVA"]))
 
 aa = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x == "D16"),
      :VAR => ByRow(x -> x in ["EXGR_FVA"]))
@@ -30,3 +30,9 @@ aa = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x =
 aa = subset(df, :IND => ByRow(x -> x == "D16"),
      :VAR => ByRow(x -> x in ["VALU_FFDDVA"]))
 
+aa = subset(df, :DECLARANT_ISO => ByRow(x -> x == "DEU"), :IND => ByRow(x -> x == "DTOTAL"), :PARTNER_ISO => ByRow(x -> x == "WLD"),
+     :VAR => ByRow(x -> x in ["IMGR"]))
+
+
+aa = subset(df, :DECLARANT_ISO => ByRow(x -> x == "AUT"), :IND => ByRow(x -> x == "D16"), :PARTNER_ISO => ByRow(x -> x == "DEU"),
+     :VAR => ByRow(x -> x in ["DFD_FVA", "FFD_DVA"]))

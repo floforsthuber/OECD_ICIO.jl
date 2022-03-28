@@ -672,4 +672,150 @@ VALU_FFDDVA = [sum(VALU_FFDDVA_p[i, :]) for i in 1:N*S]
 
 # 6.4. DFD_FVA: Foreign value added embodied in domestic final demand, USD million
 
+#   - Value added originating from ctry: AUT, ind: D16 embodied in final demand of ctry: DEU => DFD_FVA[13, 53]
 DFD_FVA = FFD_DVA'
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 6.5. DFD_FVApSH: Foreign value added embodied in domestic final demand, partner shares, percentage
+
+DFD_FVA_TOTAL = copy(DFD_FVA)
+for p in 1:N*S 
+    DFD_FVA_TOTAL[ceil(Int, p/S), p] = 0.0 # do not count domestic value added
+end
+DFD_FVA_TOTAL = [sum(DFD_FVA_TOTAL[i, s:S:N*S]) for i in 1:N, s in 1:S]
+
+#   - Foreign value added originating from ctry: AUT, ind: D16 embodied in final demand of ctry: DEU 
+#       as percentage of total foreign value added of ind: D16 => DFD_FVApSH[13, 53]
+DFD_FVApSH = DFD_FVA ./ repeat(DFD_FVA_TOTAL, 1, N) .* 100 
+for p in 1:N*S 
+    DFD_FVApSH[ceil(Int, p/S), p] = 0.0 # set domestic VA to zero
+end
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 6.6. BALVAFD: Value added embodied in final demand, balance, USD million
+BALVAFD_all = [FFD_DVA[i, ceil(Int, j/S)] - DFD_FVA[ceil(Int, i/S), j] for i in 1:N*S, j in 1:N*S] # NS×NS, balance of all ctry-ind pairs
+
+#   - Domestic value added embodied in foreign final demand minus foreign value added in domestic final demand by the value added industry
+#   - Balance from the point of ctry: AUT with ctry: DEU in ind: D16 => BALVAFD[53, 13]
+#   - Balance from the point of ctry: DEU with ctry: AUT in ind: D16 => BALVAFD[548, 2]
+BALVAFD = fill(0.0, N*S, N)
+for c in 1:N
+    for s in 1:S
+        BALVAFD[(c-1)*S+s, :] = BALVAFD_all[(c-1)*S+s, s:S:N*S] # NS×N, filter only same industries (i.e. balance between D16 and D41T43 doesnt make sense)
+    end
+end
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#6.7. FD_VA | CONS_VA | GFCF_VA: Value added embodied in final demand, consumption and GFCF, USD million
+v_hat = Diagonal(V)
+FD = copy(Y)
+
+#   - Value added originating in ctry: AUT, ind: D16 embodied in final demand of ctry: DEU => FD_VA[53, 13]
+#       + same as FFD_DVA but we do not take out domestic VA later
+FD_VA = v_hat * B * FD # NS×N
+
+#   - Value added originating in ctry: AUT, ind: D16 embodied in consumption of ctry: DEU => CONS_VA[53, 13]
+#       + Consumption (CONS) is made out of household consumption, government expenditure and NPISHs (subset of FD)
+# CONS_VA = v_hat * B * CONS
+
+#   - Value added originating in ctry: AUT, ind: D16 embodied in gross fixed capital formation of ctry: DEU => GFCF_VA[53, 13]
+#       + Gross fixed capital formation (GFCF) covers demand for private and government investment (subset of FD)
+# GFCF_VA = v_hat * B * GFCF
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 6.8. FD_VASH | CONS_VASH | GFCF_VASH: Value added shares in final demand, consumption and GFCF, percentage
+FD_VA_TOTAL = [sum(FD_VA[s:S:N*S, j]) for s in 1:S, j in 1:N] # S×N, total VA embodied in final demand per industry and destination ctry
+
+#   - Value added originating in ctry: AUT, ind: D16 embodied in final demand of ctry: DEU 
+#       as percentage share of total value added used in ctry: DEU, ind: D16 => FD_VASH[53, 13]
+FD_VASH = FD_VA ./ repeat(FD_VA_TOTAL, N) .* 100 # NS×N, what to do with NaN?
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 7.2. IMGR_BSCI: Origin of value added in gross imports, USD million
+IMGR, IMGR_INT, IMGR_FNL = trade(Z, Y, N, S, "industry", "imports") # N×NS
+v_hat = Diagonal(V)
+
+IMGR_BSCI = fill(0.0, N*S, N*S, N) # NS×NS×N
+for c in 1:N
+    IMGR_BSCI[:, :, c] = v_hat * B * Diagonal(IMGR[c, :])
+end
+
+#   - Value added in gross imports in ctry: AUT from ctry: DEU, ind: D16 where VA originated in source ctry: USA, ind: D29  => IMGR_BSCI[1685, 548, 2]
+#       + rows: source country and industry, columns: exporing country and industry, 3rd dimension: importing ctry
+IMGR_BSCI
+
+#   - IMGR_BSCI gathers most (all?) value added information (why not compute other statistics from there?)
+#       + total gross imports by ctry: AUT => sum(IMGR_BSCI[:, :, 2]) ≈ sum(IMGR[2,:])
+#       + total gross imports by ctry: AUT per industry => [sum(IMGR_BSCI[:, j, 2]) for j in 1:N*S] ≈ IMGR[2, :]
+#       + domestic value added by ctry: AUT importied via ctry: DEU, ind: D16 => sum(IMGR_BSCI[46:90, 548, 2]) ≈ IMGR_DVA[2, 548]
+
+# Note:
+#   - Note that the same value added originating from source country s can be present in the gross imports of more
+#       than one importing country c (as embodied value added, from upstream production, may cross national borders many times). 
+#       In general, therefore, these estimates should be viewed from the perspective of an importing country c.
+#   => reason why the sums are usually slightly higher than when using the other method?
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 7.3. FDVA_BSCI: Origin of value added in final demand, USD million
+FD = copy(Y)
+FD_TOTAL = [sum(FD[i, :]) for i in 1:N*S]
+
+#   - Value added entailed in final demand of ctry: AUT, ind: D16 generated by ctry: DEU, ind: D41T43 => FDVA_BSCI_2[53, 553]
+FDVA_BSCI = zeros(N*S, N*S)
+for ph in 1:N*S
+    fd = zeros(N*S)
+    fd[ph] = FD_TOTAL[ph]
+    FDVA_BSCI[ph, :] = v_hat * B * fd # NS×NS
+end
+
+c = 2
+s = 8
+fd = zeros(N*S)
+fd[(c-1)*S+s] = FD_TOTAL[(c-1)*S+s]
+e = v_hat * B * fd
+sum(e)
+
+sum(e[541:585])
+
+sum(FDVA_BSCI_2[46:90, 548])
+
+# WRONG!
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 7.4. FD_EXGRINT_VA: Gross exports of intermediate products by origin of value added and final destination, USD million
+FD = copy(Y)
+FD_TOTAL = [sum(FD[i, :]) for i in 1:N*S]
+
+
+γ = zeros(N*S, N*S)
+for c in 1:N
+    γ[(c-1)*S+1:c*S, (c-1)*S+1:c*S] .= 1.0
+    for s in 1:S
+        γ[(c-1)*S+s, (c-1)*S+s] = 0.0
+    end
+end
+
+F = Diagonal( ( γ .*  A * Diagonal(B * FD_TOTAL) ) * ones(N*S) )
+
+# NO IDEA
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 7.5. FD_EXGRFNL_VA: Gross exports of final products by origin of value added and final destination, USD million
+
+# NO IDEA
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# 7.6. FD_EXGR_VA: Gross exports by origin of value added and final destination, USD million
+
+# NO IDEA
+
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------
