@@ -3,7 +3,7 @@
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-using DataFrames, RData, CSV, XLSX, LinearAlgebra, Statistics, Intervals
+using DataFrames, RData, CSV, XLSX, LinearAlgebra, Statistics
 
 dir = "X:/VIVES/1-Personal/Florian/git/OECD_ICIO/src/"
 dir_raw = "C:/Users/u0148308/data/raw/" # location of raw data
@@ -41,6 +41,10 @@ any(iszero.(Z)) # will introduce NaN when used as divisor!
 any(iszero.(Y)) # what to do in this case?
 any(iszero.(W))
 any(iszero.(X))
+
+X_1 = [sum(Z[i,:]) + sum(Y[i,:]) for i in 1:N*S] # exports
+X_2 = [sum(Z[:,i]) + W[i] for i in 1:N*S] # imports + VA
+X_comp = [X_1 X_2 X X_1./X_2] # for comparison: seems to coincide better with exports computations
 
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------
 
